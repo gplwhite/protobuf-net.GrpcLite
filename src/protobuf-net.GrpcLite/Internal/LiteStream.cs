@@ -813,6 +813,8 @@ internal abstract class LiteStream<TSend, TReceive> : IStream, IWorker, IAsyncSt
     protected void OnComplete()
     {
         IsActive = false;
+
+        _suspendedContinuationPoint.SetResult(true);
         _connection?.Remove(Id);
     }
 
