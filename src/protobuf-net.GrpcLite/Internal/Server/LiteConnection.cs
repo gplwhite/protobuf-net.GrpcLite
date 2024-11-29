@@ -22,6 +22,13 @@ internal sealed class LiteConnection : IWorker, IConnection
     public int Id { get; }
 
     void IConnection.Remove(ushort id) => _streams.TryRemove(id, out _);
+    public void CompleteAllStreams()
+    {
+        foreach (var stream in _streams)
+        {
+            stream.Value.Cancel();
+        }
+    }
 
     CancellationToken IConnection.Shutdown => _server.ServerShutdown;
 

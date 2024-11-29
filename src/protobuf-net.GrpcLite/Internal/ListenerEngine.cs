@@ -21,6 +21,7 @@ internal interface IConnection
 
     ConcurrentDictionary<ushort, IStream> Streams { get; }
     void Remove(ushort streamId);
+    void CompleteAllStreams();
     CancellationToken Shutdown { get; }
 
     void Close(Exception? fault);
@@ -167,13 +168,16 @@ internal static class ListenerEngine
 
             logger.Debug(connection, static (state, _) => $"connection {state} ({(state.IsClient ? "client" : "server")}) exiting cleanly");
             connection.Output.Complete(null);
+            connection.CompleteAllStreams();
+
         }
         catch (OperationCanceledException oce) when (oce.CancellationToken == cancellationToken)
         { } // alt-success
         catch (Exception ex)
         {
             logger.Error(frame, static (state, ex) => $"Error processing {state}: {ex?.Message}");
-            connection?.Output.Complete(ex);
+            connection.Output.Complete(ex);
+            connection.CompleteAllStreams();
             throw;
         }
         finally

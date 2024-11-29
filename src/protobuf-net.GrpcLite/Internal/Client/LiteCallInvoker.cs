@@ -33,6 +33,13 @@ internal sealed class LiteCallInvoker : CallInvoker, IConnection, IWorker
     private int _nextId = ushort.MaxValue; // so that our first id is zero
 
     void IConnection.Remove(ushort id) => _streams.TryRemove(id, out _);
+    public void CompleteAllStreams()
+    {
+        foreach (var stream in _streams)
+        {
+            stream.Value.Cancel();
+        }
+    }
 
     CancellationToken IConnection.Shutdown => _clientShutdown.Token;
 
