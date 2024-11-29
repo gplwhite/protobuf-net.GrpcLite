@@ -18,6 +18,7 @@ internal sealed class LiteCallInvoker : CallInvoker, IConnection, IWorker
     private readonly ChannelWriter<(Frame Frame, FrameWriteFlags Flags)> _output;
     private readonly string _target;
     private readonly CancellationTokenSource _clientShutdown = new();
+    private readonly CancellationToken _shutdownToken;
     private readonly ConcurrentDictionary<ushort, IStream> _streams = new();
 
     RefCountedMemoryPool<byte> IConnection.Pool => RefCountedMemoryPool<byte>.Shared;
@@ -41,7 +42,7 @@ internal sealed class LiteCallInvoker : CallInvoker, IConnection, IWorker
         }
     }
 
-    CancellationToken IConnection.Shutdown => _clientShutdown.Token;
+    CancellationToken IConnection.Shutdown => _shutdownToken;
 
     private ClientStream<TRequest, TResponse> AddClientStream<TRequest, TResponse>(Method<TRequest, TResponse> method, in CallOptions options)
         where TRequest : class where TResponse : class
@@ -82,7 +83,9 @@ internal sealed class LiteCallInvoker : CallInvoker, IConnection, IWorker
         this._target = target;
         this._connection = connection;
         this._logger = logger;
-        _ = connection.StartWriterAsync(this, out _output, _clientShutdown.Token);
+
+        this._shutdownToken = _clientShutdown.Token;
+        _ = connection.StartWriterAsync(this, out _output, _shutdownToken);
     }
 
     ChannelWriter<(Frame Frame, FrameWriteFlags Flags)> IConnection.Output => _output;
@@ -153,7 +156,7 @@ internal sealed class LiteCallInvoker : CallInvoker, IConnection, IWorker
         {
             _logger.SetSource(LogKind.Client, "invoker");
             _logger.Debug(_target, static (state, _) => $"Starting call-invoker (client): {state}...");
-            _ = this.RunAsync(_logger, _clientShutdown.Token);
+            _ = this.RunAsync(_logger, _shutdownToken);
         }
         catch (Exception ex)
         {
