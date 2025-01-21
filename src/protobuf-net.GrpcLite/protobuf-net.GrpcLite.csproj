@@ -17,6 +17,7 @@
         <!-- has important fix for netfx ROS bug -->
         <PackageReference Include="System.Memory" Version="4.5.5" />
       <PackageReference Include="System.Threading.Channels" Version="6.0.0" />
+        <PackageReference Include="System.IO.Pipes.AccessControl" Version="5.0.0" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)'=='net462'">

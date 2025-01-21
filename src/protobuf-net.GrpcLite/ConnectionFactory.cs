@@ -10,6 +10,9 @@ using System.IO.Pipes;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+#if NET6_0_OR_GREATER
+using System.Runtime.Versioning;
+#endif
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,10 +49,46 @@ public static class ConnectionFactory
     /// <summary>
     /// Listen (as a server) to a named-pipe.
     /// </summary>
-    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, ILogger? logger = null) => async cancellationToken =>
+    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, ILogger? logger = null) 
     {
         var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous | PipeOptions.WriteThrough);
+
+        return ListenToPipe(pipeName, pipe, logger);
+    }
+
+#if !NET5_0 && !NETCOREAPP3_1
+    /// <summary>
+    /// Listen (as a server) to a named-pipe.
+    /// </summary>
+#if NET6_0_OR_GREATER
+    [SupportedOSPlatform("windows")]
+#endif
+    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, PipeSecurity pipeSecurity, ILogger? logger = null)
+    {
+#if NETFRAMEWORK
+        var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous | PipeOptions.WriteThrough, 0, 0, pipeSecurity);
+
+#elif NETSTANDARD2_1
+
+        var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough, 0, 0);
+
+        pipe.SetAccessControl(pipeSecurity);
+#else
+
+        var pipe = NamedPipeServerStreamAcl.Create(pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.WriteThrough, 0, 0, pipeSecurity);
+
+#endif
+
+        return ListenToPipe(pipeName, pipe, logger);
+    }
+#endif
+
+    private static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenToPipe(string pipeName, NamedPipeServerStream pipe, ILogger? logger = null) => async cancellationToken =>
+    {
         try
         {
             logger.Debug(pipeName, static (state, _) => $"waiting for connection... {state}");
@@ -66,6 +105,7 @@ public static class ConnectionFactory
             throw;
         }
     };
+
 
     /// <summary>
     /// Connect (as a client) to a socket server.
