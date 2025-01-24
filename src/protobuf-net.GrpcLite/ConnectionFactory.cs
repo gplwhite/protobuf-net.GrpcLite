@@ -49,13 +49,14 @@ public static class ConnectionFactory
     /// <summary>
     /// Listen (as a server) to a named-pipe.
     /// </summary>
-    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, ILogger? logger = null) 
+    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, ILogger? logger = null) => async cancellationToken =>
     {
-        var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
+        var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
             PipeOptions.Asynchronous | PipeOptions.WriteThrough);
 
-        return ListenToPipe(pipeName, pipe, logger);
-    }
+        return await WaitForClientConnection(pipeName, pipe, logger, cancellationToken);
+    };
 
 #if !NET5_0 && !NETCOREAPP3_1
     /// <summary>
@@ -64,7 +65,7 @@ public static class ConnectionFactory
 #if NET6_0_OR_GREATER
     [SupportedOSPlatform("windows")]
 #endif
-    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, PipeSecurity pipeSecurity, ILogger? logger = null)
+    public static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenNamedPipe(string pipeName, PipeSecurity pipeSecurity, ILogger? logger = null) => async cancellationToken =>
     {
 #if NETFRAMEWORK
         var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
@@ -83,11 +84,11 @@ public static class ConnectionFactory
 
 #endif
 
-        return ListenToPipe(pipeName, pipe, logger);
-    }
+        return await WaitForClientConnection(pipeName, pipe, logger, cancellationToken);
+    };
 #endif
 
-    private static Func<CancellationToken, ValueTask<ConnectionState<Stream>>> ListenToPipe(string pipeName, NamedPipeServerStream pipe, ILogger? logger = null) => async cancellationToken =>
+    private static async Task<ConnectionState<Stream>> WaitForClientConnection(string pipeName, NamedPipeServerStream pipe, ILogger? logger, CancellationToken cancellationToken)
     {
         try
         {
@@ -104,7 +105,7 @@ public static class ConnectionFactory
             pipe.SafeDispose();
             throw;
         }
-    };
+    }
 
 
     /// <summary>
